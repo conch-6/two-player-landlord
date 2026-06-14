@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>双人斗地主</title>
+    <style>
+        /* --- 1. 基础重置 --- */
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; outline: none; }
+        body, html { width: 100%; height: 100%; overflow: hidden; font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #000; }
+
+        /* --- 2. 欢迎层 --- */
+        #welcome-layer {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, #2c3e50 0%, #000000 100%);
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            z-index: 9999; transition: opacity 0.5s;
+        }
+
+        
+        
+        .start-btn {
+            padding: 15px 50px; font-size: 1.4rem; color: #fff; background: #e67e22;
+            border: 2px solid #d35400; border-radius: 50px; box-shadow: 0 0 20px rgba(230, 126, 34, 0.4);
+            cursor: pointer; transition: transform 0.1s;
+        }
+        .start-btn:active { transform: scale(0.95); }
+
+        /* --- 3. 游戏主舞台 --- */
+        #game-app {
+            display: none; width: 100%; height: 100%;
+            background: radial-gradient(circle at center, #27ae60 0%, #145a32 100%);
+            position: relative; overflow: hidden;
+            padding-top: 25px;
+        }
+
+        /* --- 4. 底部UI控件 --- */
+        .top-nav {
+            position: absolute; bottom: 15px; width: 100%; padding: 0 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            z-index: 100; pointer-events: none;
+        }
+        .nav-btn {
+            pointer-events: auto;
+            width: 40px; height: 40px; border-radius: 50%;
+            background: rgba(0,0,0,0.4); color: white; border: none;
+            display: flex; justify-content: center; align-items: center; font-size: 14px;
+            cursor: pointer;
+        }
+        .nav-btn:active { background: rgba(0,0,0,0.7); }
+
+        /* --- 5. 出牌展示区（双方共用）--- */
+        #play-area {
+            position: absolute;
+            top: calc(40% - 80px); /* 【手动微调】出牌区位置 */
+            left: 0;
+            width: 100%; height: 120px;
+            z-index: 15; pointer-events: none;
+            display: flex; justify-content: center; align-items: center;
+        }
+
+        .visual-card {
+            position: absolute;
+            width: 85px; 
+            height: 120px; 
+            background: #fff; border-radius: 5px;
+            box-shadow: -1px 0 5px rgba(0,0,0,0.2);
+            border: 1px solid #bbb;
+            display: flex; justify-content: center; align-items: center;
+            transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+            transform-origin: center center; 
+        }
+        
+        .visual-card .card-num {
+            position: absolute; top: 2px; left: 4px; font-size: 28px; font-weight: bold; line-height: 1; text-align: center;
+        }
+        .visual-card .card-suit-small {
+            position: absolute; top: 28px; left: 5px; font-size: 14px;
+        }
+        .visual-card .card-suit-big {
+            position: absolute; bottom: 8px; right: 5px;
+            font-size: 45px; opacity: 1; line-height: 1;
+        }
+
+        /* --- 7. 玩家手牌区 --- */
+        .hand-container {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 150px; z-index: 20; pointer-events: none;
+        }
+        .poker-card {
+            position: absolute; bottom: 2px;
+            width: 95px; height: 135px;
+            background-color: #fff; border-radius: 5px;
+            box-shadow: -1px 0 5px rgba(0,0,0,0.3);
+            transition: bottom 0.15s ease-out, left 0.2s ease-out;
+            cursor: pointer; pointer-events: auto; border: 1px solid #bbb;
+        }
+        .card-face { width: 100%; height: 100%; position: relative; pointer-events: none; }
+        .poker-card .card-num { position: absolute; top: 2px; left: 4px; font-size: 30px; font-weight: bold; line-height: 1; text-align: center; }
+        .poker-card .card-suit-small { position: absolute; top: 30px; left: 5px; font-size: 16px; }
+        .poker-card .card-suit-big { position: absolute; bottom: 10px; right: 6px; font-size: 50px; opacity: 1; }
+        
+        .color-red { color: #d32f2f; }
+        .color-black { color: #212121; }
+
+        /* 大小王特殊样式 */
+        .joker-card {
+            position: absolute;
+            top: 2px;
+            left: 4px;
+        }
+        .joker-big {
+            font-size: 30px;
+            font-weight: bold;
+            line-height: 1;
+        }
+        .joker-small {
+            font-size: 28px;
+            font-weight: bold;
+            line-height: 1;
+            margin-top: 2px;
+        }
+
+        .poker-card.selected { bottom: 35px; } 
+        .poker-card.touch-active::after {
+            content: ''; position: absolute; top:0; left:0; width:100%; height:100%;
+            background: rgba(0,0,0,0.1); border-radius: 5px;
+        }
+
+        /* --- 8. 按钮区 (状态控制) --- */
+        .action-bar {
+            position: absolute; 
+            bottom: 172px;
+            left: 0; width: 100%;
+            display: flex; justify-content: center; align-items: center; gap: 20px;
+            z-index: 30; pointer-events: none;
+            transition: opacity 0.3s;
+        }
+        .card-count-display {
+            pointer-events: auto;
+            min-width: 50px; height: 50px;
+            background: #c0392b; color: white;
+            border-radius: 50%; border: 3px solid #fff;
+            display: flex; justify-content: center; align-items: center;
+            font-weight: bold; font-size: 24px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .game-btn {
+            pointer-events: auto;
+            padding: 10px 30px; border-radius: 25px; border: none; font-weight: bold; color: white;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3); font-size: 16px;
+            display: none; /* 默认隐藏，由逻辑控制显示 */
+        }
+        .btn-green { background: linear-gradient(to bottom, #27ae60, #2ecc71); }
+        .btn-blue { background: linear-gradient(to bottom, #2980b9, #3498db); }
+        .game-btn:active { transform: scale(0.95); }
+
+        /* --- 9. 消息提示与弹窗 --- */
+        #toast {
+            position: absolute; top: 30%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8); color: #f1c40f; padding: 15px 30px;
+            border-radius: 8px; font-size: 20px; font-weight: bold; pointer-events: none;
+            opacity: 0; transition: opacity 0.3s; z-index: 200;
+            white-space: nowrap;
+        }
+
+        #waiting-msg {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 24px; color: white; text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            display: none; text-align: center;
+        }
+        .spinner {
+            display: inline-block; width: 40px; height: 40px;
+            border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid #fff;
+            border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 10px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- 弹窗 Modal --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 10000;
+            display: none; justify-content: center; align-items: center;
+        }
+        /* 胜负弹窗特殊样式：透明背景、靠右 */
+        #modal-gameover {
+            background: transparent;
+            justify-content: flex-end;
+            padding-right: 10%;
+        }
+        #modal-gameover .modal-content {
+            background: rgba(255,255,255,0.95);
+            box-shadow: none;
+        }
+        .modal-content {
+            background: #fff; width: 80%; max-width: 400px;
+            border-radius: 10px; padding: 20px; text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn { from {transform: scale(0.5); opacity: 0;} to {transform: scale(1); opacity: 1;} }
+        
+        .modal-title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+        .win-title { color: #e67e22; }
+        .lose-title { color: #7f8c8d; }
+        .modal-body { font-size: 16px; margin-bottom: 20px; color: #333; }
+        .modal-btns { display: flex; justify-content: center; gap: 15px; }
+        .modal-btn {
+            padding: 10px 25px; border: none; border-radius: 20px;
+            font-size: 16px; cursor: pointer;
+        }
+        .modal-confirm { background: #27ae60; color: white; }
+        .modal-cancel { background: #95a5a6; color: white; }
+
+    </style>
+</head>
+<body>
+
+    <!-- 欢迎层 -->
+    <div id="welcome-layer">
+        <h1 style="color:white; margin-bottom:30px; font-size:2rem;">双人斗地主</h1>
+        <p style="color:#aaa; margin-bottom:20px; font-size:0.9rem;">玩家ID: <span id="display-player-id">----</span></p>
+        
+        <button class="start-btn" onclick="Game.connectToRoom()">开始对局</button>
+    </div>
+
+    <!-- 游戏主界面 -->
+    <div id="game-app">
+        <div class="top-nav">
+            <div class="nav-btn" onclick="Network.exit()">退出</div>
+            <div class="nav-btn" onclick="Game.requestRestart()">重来</div>
+        </div>
+
+        <div id="play-area"></div>
+
+        <!-- 等待提示 -->
+        <div id="waiting-msg">
+            <div class="spinner"></div>
+            <div id="waiting-text">正在匹配对手...</div>
+        </div>
+
+        <!-- 按钮区：根据游戏状态显示不同按钮 -->
+        <div class="action-bar" id="action-bar">
+            <div class="card-count-display" id="op-count">0</div>
+            <!-- 出牌阶段 -->
+            <button class="game-btn btn-blue" id="btn-pass" onclick="Network.sendPass()">不出</button>
+            <button class="game-btn btn-green" id="btn-play" onclick="Hand.playSelected()">出牌</button>
+        </div>
+
+        <div class="hand-container" id="hand-container"></div>
+    </div>
+
+    <!-- 弹窗：重开请求 -->
+    <div class="modal-overlay" id="modal-restart">
+        <div class="modal-content">
+            <div class="modal-title">对局请求</div>
+            <div class="modal-body">对方请求重新开始对局，是否同意？</div>
+            <div class="modal-btns">
+                <button class="modal-btn modal-cancel" onclick="Network.respondRestart(false)">取消</button>
+                <button class="modal-btn modal-confirm" onclick="Network.respondRestart(true)">同意重开</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹窗：游戏结束 (胜负) -->
+    <div class="modal-overlay" id="modal-gameover">
+        <div class="modal-content">
+            <div class="modal-title" id="gameover-title">胜利!</div>
+            <div class="modal-body" id="gameover-msg">恭喜你赢了本局对局!</div>
+            <div class="modal-body" id="continue-wait-msg" style="display:none; color:#e67e22; font-size:14px;">等待对方继续...</div>
+            <div class="modal-btns">
+                <button class="modal-btn modal-confirm" id="btn-continue" onclick="Network.continueGame()">继续</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 弹窗：退出确认 -->
+    <div class="modal-overlay" id="modal-exit">
+        <div class="modal-content">
+            <div class="modal-title">确认退出</div>
+            <div class="modal-body">确定要退出当前对局吗？</div>
+            <div class="modal-btns">
+                <button class="modal-btn modal-cancel" onclick="Network.cancelExit()">取消</button>
+                <button class="modal-btn modal-confirm" onclick="Network.confirmExit()">确定退出</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast"></div>
+
+<script>
+    /**
+     * 工具函数：显示 Toast
+     */
+    function showToast(msg) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.style.opacity = '1';
+        setTimeout(() => t.style.opacity = '0', 2000);
+    }
+
+    /**
+     * --- 模块: PlayerID (玩家ID管理) ---
+     * 自动生成永久不变的4位数ID，存储在localStorage
+     */
+    const PlayerID = {
+        KEY: 'doudizhu_player_id',
+        id: null,
+
+        // 初始化：获取或生成ID
+        init: function() {
+            try {
+                this.id = localStorage.getItem(this.KEY);
+                if (!this.id) {
+                    this.id = this.generateID();
+                    localStorage.setItem(this.KEY, this.id);
+                }
+                console.log(`[PlayerID] 玩家ID: ${this.id}`);
+            } catch (e) {
+                // localStorage 不可用时使用临时ID
+                this.id = this.generateID();
+                console.warn(`[PlayerID] localStorage不可用，使用临时ID: ${this.id}`);
+            }
+            return this.id;
+        },
+
+        // 生成4位数ID（1000-9999）
+        generateID: function() {
+            return String(Math.floor(Math.random() * 9000) + 1000);
+        },
+
+        get: function() {
+            if (!this.id) this.init();
+            return this.id;
+        }
+    };
+
+    /**
+     * --- 模块: Network Interface (网络接口层) ---
+     * WebSocket 通信层，负责与服务器的数据收发
+     */
+    const Network = {
+        socket: null,
+        heartbeatTimer: null,
+        reconnectTimer: null,
+        lastPlayData: null, // 存储最近一次出牌数据
+
+        // 获取WebSocket服务器地址（自动适配生产环境）
+        getServerURL: function() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            return `${protocol}//${window.location.host}/?XTransformPort=8080`;
+        },
+
+        // [核心] 连接房间
+        connect: function() {
+            const playerId = PlayerID.get();
+            const serverURL = this.getServerURL();
+            console.log(`[Network] 正在连接服务器... 玩家ID: ${playerId}`);
+            console.log(`[Network] 服务器地址: ${serverURL}`);
+
+            try {
+                this.socket = new WebSocket(serverURL);
+
+                this.socket.onopen = () => {
+                    console.log('[Network] WebSocket 连接成功');
+                    // 发送加入消息
+                    this.send({ type: 'join' });
+                    this.startHeartbeat();
+                    // 进入等待状态
+                    Game.enterWaitingState();
+                    // 请求发牌
+                    this.requestDeal();
+                };
+
+                this.socket.onmessage = (event) => {
+                    try {
+                        const msg = JSON.parse(event.data);
+                        this.handleMessage(msg);
+                    } catch (e) {
+                        console.error('[Network] 消息解析失败:', e);
+                    }
+                };
+
+                this.socket.onclose = () => {
+                    console.log('[Network] WebSocket 连接关闭');
+                    this.stopHeartbeat();
+                    this.scheduleReconnect();
+                };
+
+                this.socket.onerror = (error) => {
+                    console.error('[Network] WebSocket 错误:', error);
+                    showToast('连接服务器失败，正在重试...');
+                };
+            } catch (e) {
+                console.error('[Network] 创建WebSocket失败:', e);
+                this.scheduleReconnect();
+            }
+        },
+
+        // 重连机制
+        scheduleReconnect: function() {
+            if (this.reconnectTimer) return;
+            this.reconnectTimer = setTimeout(() => {
+                this.reconnectTimer = null;
+                this.connect();
+            }, 3000);
+        },
+
+        // [核心] 发送心跳
+        startHeartbeat: function() {
+            if (this.heartbeatTimer) clearInterval(this.heartbeatTimer);
+            this.heartbeatTimer = setInterval(() => {
+                if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                    this.send({ type: 'ping' });
+                }
+            }, 25000);
+        },
+
+        stopHeartbeat: function() {
+            if (this.heartbeatTimer) {
+                clearInterval(this.heartbeatTimer);
+                this.heartbeatTimer = null;
+            }
+        },
+
+        // 统一发送方法
+        send: function(data) {
+            // 自动附加玩家ID
+            if (!data.id) data.id = PlayerID.get();
+            
+            if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+                this.socket.send(JSON.stringify(data));
+                console.log('[Network] 发送:', data);
+            } else {
+                console.warn('[Network] WebSocket 未连接，无法发送');
+            }
+        },
+
+        // 处理收到的消息
+        handleMessage: function(msg) {
+            console.log('[Network] 收到:', msg);
+
+            const myId = PlayerID.get();
+
+            // 核心逻辑：检测消息来源
+            // 如果消息中的ID与自己相同，说明是自己发的消息被广播回来，静默忽略
+            // 例外：deal_result 需要处理（提取自己的手牌）
+            if (msg.id && msg.id === myId && msg.type !== 'deal_result' && msg.type !== 'deal_request') {
+                console.log('[Network] 收到自己发送的消息，忽略');
+                return;
+            }
+
+            // 根据消息类型分发处理
+            switch (msg.type) {
+                case 'deal_request':
+                    // 对方请求发牌（用于匹配状态显示）
+                    if (msg.id !== myId) {
+                        Game.onOpponentDealRequest();
+                    }
+                    break;
+
+                case 'deal_result':
+                    // 发牌结果
+                    Game.handleDealResult(msg);
+                    break;
+
+                case 'play':
+                    // 对方出牌
+                    Game.handleOpponentPlay(msg.cards);
+                    break;
+
+                case 'pass':
+                    // 对方不出
+                    Table.showMessage("不出");
+                    Game.handleOpponentPass();
+                    break;
+
+                case 'req_restart':
+                    // 请求重开
+                    document.getElementById('modal-restart').style.display = 'flex';
+                    break;
+
+                case 'resp_restart':
+                    // 响应重开
+                    if (msg.agree) {
+                        Game.resetUI();
+                        Game.enterWaitingState();
+                        this.requestDeal();
+                    } else {
+                        showToast("对方拒绝了重开请求");
+                    }
+                    break;
+
+                case 'continue':
+                    // 对方继续
+                    Game.handleOpponentContinue();
+                    break;
+
+                case 'turn_change':
+                    // 回合切换
+                    Game.updateTurnUI(msg.isMyTurn);
+                    break;
+
+                case 'game_over':
+                    // 游戏结束
+                    const winner = msg.winner;
+                    const myId = PlayerID.get();
+                    if (winner === myId) {
+                        Game.showGameOver({ winner: 'self' });
+                    } else {
+                        Game.showGameOver({ winner: 'opponent' });
+                    }
+                    break;
+
+                case 'pong':
+                    // 心跳响应，忽略
+                    break;
+
+                default:
+                    console.warn('[Network] 未知消息类型:', msg.type);
+            }
+        },
+
+        // --- 游戏流程接口 ---
+
+        // 请求发牌
+        requestDeal: function() {
+            this.send({ type: 'deal_request' });
+            Game.enterWaitingState();
+        },
+
+        // 出牌
+        sendPlay: function(cards, startPositions) {
+            const cardsData = cards.map(c => ({val: c.val, suit: c.suit, id: c.id}));
+            // 存储出牌数据用于后续对比
+            this.lastPlayData = { cards: cardsData, id: PlayerID.get() };
+            this.send({ type: 'play', cards: cardsData });
+
+            // 显示自己的出牌
+            Table.animatePlay(cardsData, 'self', startPositions);
+            Hand.removeCards(cards);
+        },
+
+        // 不出
+        sendPass: function() {
+            this.send({ type: 'pass' });
+            Table.showMessage("不出");
+            // 隐藏按钮，等待对手回合结束
+            Game.isMyTurn = false;
+            Game.updateTurnUI(false);
+        },
+
+        // 请求重开
+        requestRestart: function() {
+            this.send({ type: 'req_restart' });
+            showToast("已发送重开请求，等待对方确认...");
+        },
+
+        // 响应重开
+        respondRestart: function(agree) {
+            document.getElementById('modal-restart').style.display = 'none';
+            this.send({ type: 'resp_restart', agree: agree });
+            if (agree) {
+                Game.resetUI();
+                Game.enterWaitingState();
+                this.requestDeal();
+            }
+        },
+
+        // 继续（游戏结束后的继续）
+        continueGame: function() {
+            const continueBtn = document.getElementById('btn-continue');
+            const waitMsg = document.getElementById('continue-wait-msg');
+            continueBtn.disabled = true;
+            continueBtn.style.opacity = '0.5';
+            continueBtn.style.cursor = 'not-allowed';
+            waitMsg.style.display = 'block';
+
+            this.send({ type: 'continue' });
+        },
+
+        // 显示退出确认弹窗
+        showExitConfirm: function() {
+            document.getElementById('modal-exit').style.display = 'flex';
+        },
+
+        // 取消退出
+        cancelExit: function() {
+            document.getElementById('modal-exit').style.display = 'none';
+        },
+
+        // 确认退出
+        confirmExit: function() {
+            document.getElementById('modal-exit').style.display = 'none';
+            this.send({ type: 'leave' });
+            if (document.exitFullscreen) document.exitFullscreen();
+            location.reload();
+        },
+
+        // 退出
+        exit: function() {
+            this.showExitConfirm();
+        }
+    };
+
+    /**
+     * --- 模块 3: Game Control (游戏主逻辑) ---
+     */
+    const Game = {
+        opCount: 0,
+        currentPhase: '', // PLAYING
+        isMyTurn: false,
+        dealRequested: false, // 是否已发送发牌请求
+
+        connectToRoom: function() {
+            const docEl = document.documentElement;
+            if (docEl.requestFullscreen) docEl.requestFullscreen();
+
+            document.getElementById('welcome-layer').style.display = 'none';
+            document.getElementById('game-app').style.display = 'block';
+
+            // 初始化玩家ID
+            const playerId = PlayerID.init();
+            console.log(`[Game] 玩家ID: ${playerId}`);
+
+            // 显示玩家ID
+            const idDisplay = document.getElementById('display-player-id');
+            if (idDisplay) idDisplay.textContent = playerId;
+
+            // 连接服务器
+            Network.connect();
+        },
+
+        enterWaitingState: function() {
+            document.getElementById('waiting-msg').style.display = 'block';
+            document.getElementById('waiting-text').innerText = "等待对手连接...";
+
+            // 清空桌面
+            document.getElementById('hand-container').innerHTML = '';
+            Table.clear();
+
+            // 重置对手牌数显示
+            this.opCount = 0;
+            document.getElementById('op-count').innerText = '0';
+
+            // 隐藏所有游戏按钮
+            document.querySelectorAll('.game-btn').forEach(btn => btn.style.display = 'none');
+        },
+
+        // 对手请求发牌（用于更新等待状态）
+        onOpponentDealRequest: function() {
+            document.getElementById('waiting-text').innerText = "对手已就绪，等待服务器发牌...";
+        },
+
+        // 处理发牌结果
+        handleDealResult: function(msg) {
+            const myId = PlayerID.get();
+            
+            // 关闭游戏结束弹窗（如果还在显示）
+            document.getElementById('modal-gameover').style.display = 'none';
+
+            // 清除桌面残留
+            Table.clear();
+
+            // 从发牌结果中提取自己的手牌
+            let myHand = null;
+            if (msg.hands && msg.hands[myId]) {
+                myHand = msg.hands[myId];
+            } else {
+                console.error('[Game] 未找到自己的手牌数据');
+                return;
+            }
+
+            document.getElementById('waiting-msg').style.display = 'none';
+            this.currentPhase = 'PLAYING';
+            this.isMyTurn = msg.firstTurn === myId;
+
+            // 初始化手牌
+            Hand.init(myHand);
+
+            // 更新对手牌数（每人18张）
+            this.updateOpponentCount({ set: 18 });
+
+            // 更新回合UI
+            this.updateTurnUI(this.isMyTurn);
+        },
+
+        startGame: function(data) {
+            document.getElementById('waiting-msg').style.display = 'none';
+            this.currentPhase = data.phase;
+
+            // --- 正式出牌阶段 ---
+            if (data.phase === 'PLAYING') {
+                Hand.init(data.myHand);
+
+                // 使用后端传来的对手牌数
+                this.updateOpponentCount({ set: data.opponentCardCount || 18 });
+            }
+        },
+
+        // 更新回合UI：根据后端传入的是否轮到我，决定显示/隐藏按钮
+        updateTurnUI: function(isMyTurn) {
+            // 1. 先隐藏所有按钮
+            document.querySelectorAll('.game-btn').forEach(btn => btn.style.display = 'none');
+
+            if (!isMyTurn) {
+                // 如果不是我的回合，隐藏所有按钮
+            } else {
+                // 如果是我的回合，根据当前阶段显示按钮
+                this.setControls(this.currentPhase);
+            }
+        },
+
+        setControls: function(phase) {
+            if (phase === 'PLAYING') {
+                document.getElementById('btn-pass').style.display = 'block';
+                document.getElementById('btn-play').style.display = 'block';
+            }
+        },
+
+        handleOpponentPlay: function(cards) {
+            this.updateOpponentCount({ delta: -cards.length });
+            Table.animatePlay(cards, 'opponent', null);
+            // 切换回合
+            this.isMyTurn = true;
+            this.updateTurnUI(true);
+        },
+
+        handleOpponentPass: function() {
+            // 对手不出，轮到我
+            this.isMyTurn = true;
+            this.updateTurnUI(true);
+        },
+
+        requestRestart: function() {
+            if (document.getElementById('modal-gameover').style.display === 'flex') return;
+            Network.requestRestart();
+        },
+
+        resetUI: function() {
+            Table.clear();
+            Hand.container.innerHTML = '';
+        },
+
+        updateOpponentCount: function(param) {
+            if (typeof param === 'object' && param.set !== undefined) {
+                // 设置为指定值
+                this.opCount = param.set;
+            } else if (typeof param === 'object' && param.delta !== undefined) {
+                // 增量变化
+                this.opCount += param.delta;
+            }
+
+            if (this.opCount < 0) this.opCount = 0;
+            document.getElementById('op-count').innerText = this.opCount;
+            // 胜负由服务端广播game_over触发，不再本地检测
+        },
+
+        handleOpponentContinue: function() {
+            const waitMsg = document.getElementById('continue-wait-msg');
+            if (waitMsg) {
+                waitMsg.innerText = "对方已点击继续，正在开始新对局...";
+            }
+        },
+
+        showGameOver: function(result) {
+            const modal = document.getElementById('modal-gameover');
+            const title = document.getElementById('gameover-title');
+            const msg = document.getElementById('gameover-msg');
+            const continueBtn = document.getElementById('btn-continue');
+            const waitMsg = document.getElementById('continue-wait-msg');
+
+            // 重置继续按钮状态
+            continueBtn.disabled = false;
+            continueBtn.style.opacity = '1';
+            continueBtn.style.cursor = 'pointer';
+            waitMsg.style.display = 'none';
+            waitMsg.innerText = '等待对方继续...';
+
+            modal.style.display = 'flex';
+
+            if (result.winner === 'self') {
+                title.innerText = "恭喜您！";
+                title.className = "modal-title win-title";
+                msg.innerText = "这局打得真好，继续加油哦！";
+                this.confettiEffect();
+            } else {
+                title.innerText = "没关系";
+                title.className = "modal-title lose-title";
+                msg.innerText = "这局运气稍差，下局再来！";
+            }
+        },
+
+        confettiEffect: function() {
+            for(let i=0; i<30; i++) {
+                const el = document.createElement('div');
+                el.style.position = 'fixed';
+                el.style.left = '50%';
+                el.style.top = '50%';
+                el.style.width = '10px';
+                el.style.height = '10px';
+                el.style.backgroundColor = ['#f00', '#0f0', '#00f', '#ff0'][Math.floor(Math.random()*4)];
+                el.style.zIndex = 10001;
+                el.style.transition = 'all 1s ease-out';
+                document.body.appendChild(el);
+                
+                setTimeout(() => {
+                    el.style.transform = `translate(${(Math.random()-0.5)*500}px, ${(Math.random()-0.5)*500}px) scale(0)`;
+                }, 10);
+                setTimeout(() => el.remove(), 1000);
+            }
+        }
+    };
+
+    /**
+     * --- 模块 4: Table UI (桌面展示) ---
+     */
+    const Table = {
+        playArea: document.getElementById('play-area'),
+
+        clear: function() {
+            this.playArea.innerHTML = '';
+        },
+
+        showMessage: function(text) {
+            this.clear();
+            const div = document.createElement('div');
+            div.innerText = text;
+            div.style.color = "#ffeb3b";
+            div.style.fontSize = "24px";
+            div.style.fontWeight = "bold";
+            div.style.textShadow = "0 2px 4px rgba(0,0,0,0.8)";
+            this.playArea.appendChild(div);
+        },
+
+        animatePlay: function(cardsData, type, startPos) {
+            this.clear(); // 每次出牌都清空之前的
+            const targetContainer = this.playArea;
+            const containerRect = targetContainer.getBoundingClientRect();
+            const centerX = containerRect.left + containerRect.width / 2;
+            const centerY = containerRect.top + containerRect.height / 2;
+
+            const spread = 35; // 【手动微调】出牌区牌与牌之间的间距
+            const cardW = 85;
+
+            const numCards = cardsData.length;
+            // 取消自动换行，所有牌在一行显示
+
+            let startRect;
+            if (type === 'self' && startPos && startPos.length > 0) {
+                startRect = { left: startPos[0].left, top: startPos[0].top };
+            } else {
+                // 对手出牌从屏幕中央顶部开始
+                startRect = { left: window.innerWidth / 2, top: 50 };
+            }
+
+            // 计算总宽度（所有牌在一行）
+            const totalWidth = (numCards - 1) * spread + cardW;
+
+            cardsData.forEach((card, i) => {
+                const el = document.createElement('div');
+                el.className = 'visual-card';
+
+                // 检测是否是大小王
+                if (card.val === '大' || card.val === '小') {
+                    el.innerHTML = `
+                        <div class="card-face">
+                            <div class="joker-card ${card.color}">
+                                <div class="joker-big">${card.val}</div>
+                                <div class="joker-small">王</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    el.innerHTML = `
+                        <div class="card-face">
+                            <div class="card-num ${card.color}">${card.val}</div>
+                            <div class="card-suit-small ${card.color}">${card.suit}</div>
+                            <div class="card-suit-big ${card.color}">${card.suit}</div>
+                        </div>
+                    `;
+                }
+
+                let currentStartLeft = startRect.left;
+                let currentStartTop = startRect.top;
+
+                if (type === 'self' && startPos && startPos[i]) {
+                    currentStartLeft = startPos[i].left;
+                    currentStartTop = startPos[i].top;
+                }
+
+                el.style.left = currentStartLeft + 'px';
+                el.style.top = currentStartTop + 'px';
+                el.style.zIndex = 100 + i;
+                el.style.transform = type === 'self' ? 'scale(1)' : 'scale(0.7)';
+
+                document.body.appendChild(el);
+
+                // 计算目标位置（单行，不自动换行）
+                // 只要不超出视图边界即可
+                let targetX = centerX - totalWidth / 2 + i * spread + cardW / 2;
+                let targetY = centerY - 50;
+                
+                // 边界检查：确保牌不超出视图外
+                const minLeft = cardW / 2 + 10; // 左边界
+                const maxRight = window.innerWidth - cardW / 2 - 10; // 右边界
+                if (targetX < minLeft) targetX = minLeft;
+                if (targetX > maxRight) targetX = maxRight;
+
+                el.getBoundingClientRect(); // trigger reflow
+
+                requestAnimationFrame(() => {
+                    el.style.left = targetX + 'px';
+                    el.style.top = targetY + 'px';
+                    el.style.transform = 'scale(0.9)';
+                });
+
+                setTimeout(() => {
+                    el.remove();
+                    const staticEl = el.cloneNode(true);
+                    staticEl.style.position = 'absolute';
+                    staticEl.style.left = `calc(50% - ${centerX - targetX}px)`;
+                    staticEl.style.top = `calc(50% - ${centerY - targetY}px)`;
+                    staticEl.style.transform = 'translate(-50%, -50%) scale(0.9)';
+                    staticEl.style.margin = 0;
+                    staticEl.style.zIndex = i;
+                    targetContainer.appendChild(staticEl);
+                }, 400);
+            });
+        }
+    };
+
+    /**
+     * --- 模块 5: Hand Logic (手牌逻辑 + 排序) ---
+     */
+    const Hand = {
+        container: document.getElementById('hand-container'),
+        cards: [],
+        
+        init: function(cardData) {
+            this.cards = cardData;
+            this.sortCards(); 
+            this.render();
+        },
+        
+        sortCards: function() {
+            // 修改点：更新了 valueMap，增加小王和大王的权重
+            const valueMap = {
+                '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10,
+                'J': 11, 'Q': 12, 'K': 13, 'A': 14, '2': 15,
+                '小': 16,
+                '大': 17
+            };
+            const suitMap = { '♠': 1, '♥': 2, '♣': 3, '♦': 4 };
+
+            this.cards.sort((a, b) => {
+                let va = valueMap[a.val] || 0;
+                let vb = valueMap[b.val] || 0;
+
+                // 修改点：移除了旧的 Joker 检查逻辑，直接使用 valueMap 映射
+
+                if (va !== vb) {
+                    return vb - va; // 降序
+                }
+
+                const sa = suitMap[a.suit] || 0;
+                const sb = suitMap[b.suit] || 0;
+                return sa - sb;
+            });
+        },
+        
+        render: function() {
+            this.container.innerHTML = '';
+            const count = this.cards.length;
+            if (count === 0) return;
+            const screenW = window.innerWidth;
+            const availableW = screenW - 40;
+            const cardW = 95;
+            let overlap = 45;
+            if ((count - 1) * overlap + cardW > availableW) {
+                overlap = (availableW - cardW) / (count - 1);
+            }
+            const totalW = (count - 1) * overlap + cardW;
+            const startX = (screenW - totalW) / 2;
+            
+            this.cards.forEach((card, index) => {
+                const el = document.createElement('div');
+                el.className = 'poker-card';
+                el.dataset.index = index;
+                el.style.left = (startX + index * overlap) + 'px';
+                el.style.zIndex = index + 10;
+
+                // 检测是否是大小王
+                if (card.val === '大' || card.val === '小') {
+                    el.innerHTML = `
+                        <div class="card-face">
+                            <div class="joker-card ${card.color}">
+                                <div class="joker-big">${card.val}</div>
+                                <div class="joker-small">王</div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    el.innerHTML = `
+                        <div class="card-face">
+                            <div class="card-num ${card.color}">${card.val}</div>
+                            <div class="card-suit-small ${card.color}">${card.suit}</div>
+                            <div class="card-suit-big ${card.color}">${card.suit}</div>
+                        </div>
+                    `;
+                }
+                this.container.appendChild(el);
+            });
+        },
+        
+        playSelected: function() {
+            const domCards = document.querySelectorAll('.poker-card');
+            const selectedIndices = [];
+            const selectedCardsData = [];
+            const startPositions = []; 
+
+            domCards.forEach((el, i) => {
+                if (el.classList.contains('selected')) {
+                    selectedIndices.push(i);
+                    selectedCardsData.push(this.cards[i]);
+                    startPositions.push(el.getBoundingClientRect());
+                }
+            });
+
+            if (selectedIndices.length === 0) return;
+            
+            // 发送出牌数据
+            Network.sendPlay(selectedCardsData, startPositions);
+            
+            // 更新手牌数
+            this.removeCards(selectedCardsData);
+
+            // 检查是否胜利
+            if (this.cards.length === 0) {
+                setTimeout(() => {
+                    // 发送胜利消息
+                    Network.send({ type: 'game_over', winner: PlayerID.get() });
+                }, 1000);
+            }
+
+            // 切换到对手回合
+            Game.isMyTurn = false;
+            Game.updateTurnUI(false);
+        },
+        
+        removeCards: function(cardsToRemove) {
+            const remaining = this.cards.filter(c => !cardsToRemove.some(r => r.id === c.id));
+            this.cards = remaining;
+            this.sortCards();
+            this.render();
+        }
+    };
+
+    /**
+     * --- 模块 6: Input Logic (触控/鼠标) ---
+     */
+    (function setupInput() {
+        const container = Hand.container;
+        let startX = 0, startY = 0;
+        let isDragging = false; 
+        let actionType = 'select'; 
+        let startIdx = -1; 
+        let currentIdx = -1; 
+
+        function getIdx(x, y) {
+            const el = document.elementFromPoint(x, y);
+            if (!el) return -1;
+            const card = el.closest('.poker-card');
+            if (card && container.contains(card)) return parseInt(card.dataset.index);
+            return -1;
+        }
+        function updateHighlight(s, e) {
+            const cards = document.querySelectorAll('.poker-card');
+            cards.forEach(c => c.classList.remove('touch-active'));
+            const min = Math.min(s, e), max = Math.max(s, e);
+            for(let i=min; i<=max; i++) if(cards[i]) cards[i].classList.add('touch-active');
+        }
+        container.addEventListener('touchstart', e => {
+            const touch = e.touches[0];
+            startX = touch.clientX; startY = touch.clientY;
+            const idx = getIdx(startX, startY);
+            if (idx !== -1) {
+                isDragging = false; 
+                startIdx = idx; currentIdx = idx;
+                const isSelected = document.querySelectorAll('.poker-card')[idx].classList.contains('selected');
+                actionType = isSelected ? 'deselect' : 'select';
+                updateHighlight(idx, idx);
+            }
+        }, {passive:false});
+        container.addEventListener('touchmove', e => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const x = touch.clientX; const y = touch.clientY;
+            const delta = Math.hypot(x - startX, y - startY);
+            if (delta > 10) { isDragging = true; }
+            if (isDragging) {
+                const idx = getIdx(x, y);
+                if(idx !== -1) { currentIdx = idx; updateHighlight(startIdx, currentIdx); }
+            }
+        }, {passive:false});
+        window.addEventListener('touchend', () => {
+            const cards = document.querySelectorAll('.poker-card');
+            if (!isDragging && startIdx !== -1) {
+                if(cards[startIdx]) cards[startIdx].classList.toggle('selected');
+            } else if (isDragging && startIdx !== -1) {
+                const min = Math.min(startIdx, currentIdx);
+                const max = Math.max(startIdx, currentIdx);
+                for(let i=min; i<=max; i++) {
+                    if(cards[i]) {
+                        if(actionType === 'select') cards[i].classList.add('selected');
+                        else cards[i].classList.remove('selected');
+                    }
+                }
+            }
+            cards.forEach(c => c.classList.remove('touch-active'));
+            startIdx = -1; currentIdx = -1; isDragging = false;
+        });
+        container.addEventListener('mousedown', e => {
+            const evt = new TouchEvent('touchstart', { touches: [{clientX: e.clientX, clientY: e.clientY}] });
+            container.dispatchEvent(evt);
+        });
+        window.addEventListener('mousemove', e => {
+            if(startIdx === -1) return;
+            const evt = new TouchEvent('touchmove', { touches: [{clientX: e.clientX, clientY: e.clientY}] });
+            container.dispatchEvent(evt);
+        });
+        window.addEventListener('mouseup', () => { window.dispatchEvent(new Event('touchend')); });
+    })();
+
+    window.addEventListener('resize', () => {
+        if(document.getElementById('game-app').style.display === 'block') {
+            Hand.render();
+        }
+    });
+
+    // 页面加载时初始化玩家ID并显示
+    window.addEventListener('DOMContentLoaded', () => {
+        const playerId = PlayerID.init();
+        const idDisplay = document.getElementById('display-player-id');
+        if (idDisplay) {
+            idDisplay.textContent = playerId;
+        }
+        console.log(`[初始化] 玩家ID: ${playerId}`);
+    });
+
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "doudizhu-server",
+  "version": "1.0.0",
+  "description": "双人斗地主游戏服务器",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.19.0"
+  },
+  "author": "",
+  "license": "MIT"
+}
