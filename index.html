@@ -381,11 +381,11 @@ const Network = {
     },
 
     sendPass: function() {
-        this.send({ type: 'pass' });
-        Table.showMessage("不出");
-        Game.isMyTurn = false;
-        Game.updateTurnUI(false);
-    },
+    this.send({ type: 'pass' });
+    Table.showMessage("不出");
+    Game.isMyTurn = false;
+    Game.updateTurnUI(false);
+},
 
     requestRestart: function() {
         this.send({ type: 'req_restart' });
