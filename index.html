@@ -381,11 +381,17 @@ const Network = {
     },
 
     sendPass: function() {
-        this.send({ type: 'pass' });
-        Table.showMessage("不出");
-        Game.isMyTurn = false;
-        Game.updateTurnUI(false);
-    },
+    this.send({ type: 'pass' });
+    Table.showMessage("不出");
+    
+    // 强制重新渲染手牌，清除所有选中状态并复位
+    if (Hand.cards.length > 0) {
+        Hand.render();
+    }
+    
+    Game.isMyTurn = false;
+    Game.updateTurnUI(false);
+},
 
     requestRestart: function() {
         this.send({ type: 'req_restart' });
