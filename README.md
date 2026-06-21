@@ -41,9 +41,7 @@ node server.js
 
 4. 服务器将在 **6660** 端口启动。
 ```bash
-http://<你的IP>:6660   # 局域网范围内使用
-或
-http://localhost:6660   # 只能在运行服务器的设备上使用
+http://<你的IP>:6660
 ```
 
 
@@ -55,8 +53,3 @@ http://localhost:6660   # 只能在运行服务器的设备上使用
 ├── package.json  # 依赖配置
 └── README.md     # 本文档
 ```
-
-
-## 许可证
-
-Apache License 2.0
